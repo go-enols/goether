@@ -1,9 +1,10 @@
 package goether
 
 import (
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,6 +18,31 @@ type TxOpts struct {
 	GasPrice  *big.Int
 	GasTipCap *big.Int
 	GasFeeCap *big.Int
+}
+
+// GetOldFee 计算出本次如果使用旧版交易时最大消耗Gas手续费
+func (t *TxOpts) GetOldFee() (*big.Int, error) {
+	if t.GasPrice != nil && t.GasLimit != nil {
+		// 旧版费用计算：GasPrice * GasLimit
+		fee := new(big.Int)
+		fee.Mul(t.GasPrice, big.NewInt(int64(*t.GasLimit)))
+		return fee, nil
+	}
+	return nil, errors.New("未设置基础参数")
+}
+
+// GetNewFee 计算出本次如果使用新版交易时最大消耗Gas手续费
+func (t *TxOpts) GetNewFee() (*big.Int, error) {
+	if t.GasTipCap != nil && t.GasFeeCap != nil && t.GasLimit != nil {
+		// 新版费用计算：(GasTipCap + GasFeeCap) * GasLimit
+		totalCap := new(big.Int)
+		totalCap.Add(new(big.Int).Mul(t.GasTipCap, big.NewInt(2)), t.GasFeeCap)
+
+		fee := new(big.Int)
+		fee.Mul(totalCap, big.NewInt(int64(*t.GasLimit)))
+		return fee, nil
+	}
+	return nil, errors.New("未设置基础参数")
 }
 
 type Wallet struct {
@@ -54,7 +80,7 @@ func NewWallet(prvHex, rpc string) (*Wallet, error) {
 }
 
 func NewWalletFromPath(prvPath, rpc string) (*Wallet, error) {
-	b, err := ioutil.ReadFile(prvPath)
+	b, err := os.ReadFile(prvPath)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +89,7 @@ func NewWalletFromPath(prvPath, rpc string) (*Wallet, error) {
 }
 
 func (w *Wallet) SendTx(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (txHash string, err error) {
-	opts, err = w.initTxOpts(to, amount, data, opts)
+	opts, err = w.InitTxOpts(to, amount, data, opts)
 	if err != nil {
 		return
 	}
@@ -89,7 +115,7 @@ func (w *Wallet) SendTx(to common.Address, amount *big.Int, data []byte, opts *T
 }
 
 func (w *Wallet) SendLegacyTx(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (txHash string, err error) {
-	opts, err = w.initTxOpts(to, amount, data, opts)
+	opts, err = w.InitTxOpts(to, amount, data, opts)
 	if err != nil {
 		return
 	}
@@ -113,7 +139,7 @@ func (w *Wallet) SendLegacyTx(to common.Address, amount *big.Int, data []byte, o
 	return w.Client.EthSendRawTransaction(hexutil.Encode(raw))
 }
 
-func (w *Wallet) initTxOpts(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (*TxOpts, error) {
+func (w *Wallet) InitTxOpts(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (*TxOpts, error) {
 	var (
 		nonce, gasLimit int
 		gasPrice        big.Int
@@ -174,6 +200,23 @@ func (w *Wallet) GetPendingNonce() (nonce int, err error) {
 	return w.Client.EthGetTransactionCount(w.GetAddress(), "pending")
 }
 
-func (w *Wallet) GetBalance() (balance big.Int, err error) {
+// GetBalance 获取钱包余额 如果传递了 token 则查询 token 余额
+func (w *Wallet) GetBalance(token ...string) (balance big.Int, err error) {
+	if len(token) > 0 {
+		return w.getTokenBalance(token[0])
+	}
 	return w.Client.EthGetBalance(w.GetAddress(), "latest")
+}
+
+// getTokenBalance 获取 token 代币中本钱包持有的余额
+func (w *Wallet) getTokenBalance(token string) (balance big.Int, err error) {
+	res, err := w.Client.EthCall(ethrpc.T{
+		From: w.GetAddress(),
+		To:   token,
+		Data: fmt.Sprintf("0x70a08231000000000000000000000000%s", w.GetAddress()[2:]),
+	}, "latest")
+	if err != nil {
+		return
+	}
+	return ethrpc.ParseBigInt(res)
 }

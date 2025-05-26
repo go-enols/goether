@@ -1,13 +1,10 @@
 module github.com/go-enols/goether
 
-go 1.23.0
-
-toolchain go1.24.2
+go 1.24.2
 
 require (
 	github.com/ethereum/go-ethereum v1.15.11
-	github.com/everFinance/ethrpc v1.0.5
-	github.com/go-enols/ethrpc v0.0.1
+	github.com/go-enols/ethrpc v0.0.2
 	github.com/stretchr/testify v1.10.0
 )
 
