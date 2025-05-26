@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/everFinance/goether"
+	"github.com/go-enols/goether"
 )
 
 func TestWalletSend(t *testing.T) {

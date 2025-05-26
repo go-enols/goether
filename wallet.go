@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/everFinance/ethrpc"
+	"github.com/go-enols/ethrpc"
 )
 
 type TxOpts struct {

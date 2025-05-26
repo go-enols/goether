@@ -2,8 +2,8 @@ package goether
 
 import (
 	"crypto/ecdsa"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -34,7 +34,7 @@ func NewSigner(prvHex string) (*Signer, error) {
 }
 
 func NewSignerFromPath(prvPath string) (*Signer, error) {
-	b, err := ioutil.ReadFile(prvPath)
+	b, err := os.ReadFile(prvPath)
 	if err != nil {
 		return nil, err
 	}

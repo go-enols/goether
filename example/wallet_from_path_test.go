@@ -3,7 +3,7 @@ package example
 import (
 	"testing"
 
-	"github.com/everFinance/goether"
+	"github.com/go-enols/goether"
 )
 
 func TestWalletFromPath(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/everFinance/ethrpc"
+	"github.com/go-enols/ethrpc"
 )
 
 type Contract struct {
@@ -35,10 +35,11 @@ func NewContract(address common.Address, abiStr, rpc string, wallet *Wallet) (*C
 
 // CallMethod Only read contract status
 // tag:
-// 	HEX String - an integer block number
-//  String "earliest" for the earliest/genesis block
-//  String "latest" - for the latest mined block
-//  String "pending" - for the pending state/transactions
+//
+//		HEX String - an integer block number
+//	 String "earliest" for the earliest/genesis block
+//	 String "latest" - for the latest mined block
+//	 String "pending" - for the pending state/transactions
 func (c *Contract) CallMethod(methodName, tag string, args ...interface{}) (res string, err error) {
 	data, err := c.EncodeData(methodName, args...)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/everFinance/goether"
+	"github.com/go-enols/goether"
 )
 
 func TestContractCall(t *testing.T) {
