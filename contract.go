@@ -148,3 +148,36 @@ func (c *Contract) DecodeEventHex(topicsHex []string, dataHex string) (eventName
 	}
 	return c.DecodeEvent(topics, common.FromHex(dataHex))
 }
+
+func (c *Contract) DecodeFromMethod(method string, output any, results *[]any) error {
+
+	if results == nil {
+		results = new([]any)
+	}
+
+	var data []byte
+
+	if value, ok := output.(string); ok {
+		d, err := hexutil.Decode(value)
+		if err != nil {
+			return err
+		}
+		data = d
+	} else if value, ok := output.([]byte); ok {
+		data = value
+	} else {
+		return errors.New("output 无效的类型")
+	}
+	if len(data) == 0 {
+		*results = make([]interface{}, 0)
+		return nil
+	}
+
+	if len(*results) == 0 {
+		res, err := c.ABI.Unpack(method, data)
+		*results = res
+		return err
+	}
+	res := *results
+	return c.ABI.UnpackIntoInterface(res[0], method, data)
+}
