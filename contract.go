@@ -19,7 +19,7 @@ type Contract struct {
 	Client *ethrpc.EthRPC
 }
 
-func NewContract(address common.Address, abiStr, rpc string, wallet *Wallet) (*Contract, error) {
+func NewContract(address common.Address, abiStr, rpc string, wallet *Wallet, options ...func(rpc *ethrpc.EthRPC)) (*Contract, error) {
 	Abi, err := abi.JSON(strings.NewReader(abiStr))
 	if err != nil {
 		return nil, err
