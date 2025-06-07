@@ -53,13 +53,13 @@ type Wallet struct {
 	Client *ethrpc.EthRPC
 }
 
-func NewWallet(prvHex, rpc string) (*Wallet, error) {
+func NewWallet(prvHex, rpc string, options ...func(rpc *ethrpc.EthRPC)) (*Wallet, error) {
 	signer, err := NewSigner(prvHex)
 	if err != nil {
 		return nil, err
 	}
 
-	client := ethrpc.New(rpc)
+	client := ethrpc.New(rpc, options...)
 
 	version, err := client.NetVersion()
 	if err != nil {

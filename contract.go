@@ -29,7 +29,7 @@ func NewContract(address common.Address, abiStr, rpc string, wallet *Wallet, opt
 		Address: address,
 		ABI:     Abi,
 		Wallet:  wallet,
-		Client:  ethrpc.New(rpc),
+		Client:  ethrpc.New(rpc, options...),
 	}, nil
 }
 
