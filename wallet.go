@@ -53,21 +53,118 @@ type Wallet struct {
 	Client *ethrpc.EthRPC
 }
 
-func NewWallet(prvHex, rpc string, options ...func(rpc *ethrpc.EthRPC)) (*Wallet, error) {
+// NewWallet 创建一个新的以太坊钱包实例
+//
+// 该函数是创建钱包的核心方法，支持多种配置选项来定制钱包的行为。
+// 钱包实例包含了地址、链ID、签名器和RPC客户端等核心组件。
+//
+// 参数:
+//   - prvHex: 私钥的十六进制字符串表示，用于创建签名器
+//   - rpc: 以太坊节点的RPC端点URL
+//   - options: 可变参数，支持以下类型的配置选项：
+//   - func(rpc *ethrpc.EthRPC): RPC客户端配置函数
+//   - *ethrpc.EthRPC: 预先配置的RPC客户端实例
+//   - string: 网络版本号，用于确定链ID
+//   - *big.Int: 直接指定的链ID
+//   - *Wallet: 从现有钱包复制链ID和客户端配置
+//
+// 返回值:
+//   - *Wallet: 创建的钱包实例，包含地址、链ID、签名器和RPC客户端
+//   - error: 创建过程中的错误，如私钥无效、RPC连接失败等
+//
+// 工作流程:
+//  1. 解析可变参数，提取各种配置选项
+//  2. 使用私钥创建签名器，获取钱包地址
+//  3. 如果未提供RPC客户端，则使用RPC URL和配置选项创建新客户端
+//  4. 如果未指定网络版本，则通过RPC调用获取
+//  5. 如果未指定链ID，则从网络版本解析
+//  6. 组装并返回完整的钱包实例
+//
+// 使用示例:
+//
+//		// 基本用法
+//		wallet, err := NewWallet("0x1234...", "https://mainnet.infura.io/v3/YOUR-PROJECT-ID")
+//
+//		// 指定链ID
+//		chainID := big.NewInt(1) // 主网
+//		wallet, err := NewWallet("0x1234...", "https://mainnet.infura.io/v3/YOUR-PROJECT-ID", chainID)
+//
+//		// 使用自定义RPC客户端
+//		client := ethrpc.New("https://mainnet.infura.io/v3/YOUR-PROJECT-ID")
+//		wallet, err := NewWallet("0x1234...", "", client)
+//
+//		// 从现有钱包复制配置
+//		newWallet, err := NewWallet("0x5678...", "", existingWallet)
+//	    • *Wallet: 从现有钱包复制链ID和客户端配置
+//
+// 返回值:
+//   - *Wallet: 创建的钱包实例，包含地址、链ID、签名器和RPC客户端
+//   - error: 创建过程中的错误，如私钥无效、RPC连接失败等
+//
+// 工作流程:
+//  1. 解析可变参数，提取各种配置选项
+//  2. 使用私钥创建签名器，获取钱包地址
+//  3. 如果未提供RPC客户端，则使用RPC URL和配置选项创建新客户端
+//  4. 如果未指定网络版本，则通过RPC调用获取
+//  5. 如果未指定链ID，则从网络版本解析
+//  6. 组装并返回完整的钱包实例
+//
+// 使用示例:
+//
+//	// 基本用法
+//	wallet, err := NewWallet("0x1234...", "https://mainnet.infura.io/v3/YOUR-PROJECT-ID")
+//
+//	// 指定链ID
+//	chainID := big.NewInt(1) // 主网
+//	wallet, err := NewWallet("0x1234...", "https://mainnet.infura.io/v3/YOUR-PROJECT-ID", chainID)
+//
+//	// 使用自定义RPC客户端
+//	client := ethrpc.New("https://mainnet.infura.io/v3/YOUR-PROJECT-ID")
+//	wallet, err := NewWallet("0x1234...", "", client)
+//
+//	// 从现有钱包复制配置(这个只会复制client信息以及节点信息)
+//	newWallet, err := NewWallet("0x5678...", "", existingWallet)
+func NewWallet(prvHex, rpc string, options ...any) (*Wallet, error) {
+	var clientOptions []func(rpc *ethrpc.EthRPC)
+	var client *ethrpc.EthRPC
+	var version string
+	var chainID *big.Int
+	for _, opt := range options {
+		switch data := opt.(type) {
+		case func(rpc *ethrpc.EthRPC):
+			clientOptions = append(clientOptions, data)
+		case *ethrpc.EthRPC:
+			client = data
+		case string:
+			version = data
+		case *big.Int:
+			chainID = data
+		case *Wallet:
+			chainID = data.ChainID
+			client = data.Client
+		}
+	}
 	signer, err := NewSigner(prvHex)
 	if err != nil {
 		return nil, err
 	}
 
-	client := ethrpc.New(rpc, options...)
-
-	version, err := client.NetVersion()
-	if err != nil {
-		return nil, err
+	if client == nil {
+		client = ethrpc.New(rpc, clientOptions...)
 	}
-	chainID, ok := new(big.Int).SetString(version, 10)
-	if !ok {
-		return nil, fmt.Errorf("wrong chainID: %s", version)
+
+	if version == "" {
+		version, err = client.NetVersion()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if chainID == nil {
+		var ok bool
+		chainID, ok = new(big.Int).SetString(version, 10)
+		if !ok {
+			return nil, fmt.Errorf("wrong chainID: %s", version)
+		}
 	}
 
 	return &Wallet{
