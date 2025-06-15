@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/go-enols/ethrpc"
+	"github.com/go-enols/go-log"
 )
 
 type TxOpts struct {
@@ -125,6 +126,8 @@ type Wallet struct {
 //	// 从现有钱包复制配置(这个只会复制client信息以及节点信息)
 //	newWallet, err := NewWallet("0x5678...", "", existingWallet)
 func NewWallet(prvHex, rpc string, options ...any) (*Wallet, error) {
+	log.Debug("Creating new wallet", "rpc", rpc, "optionsCount", len(options))
+
 	var clientOptions []func(rpc *ethrpc.EthRPC)
 	var client *ethrpc.EthRPC
 	var version string
@@ -133,39 +136,57 @@ func NewWallet(prvHex, rpc string, options ...any) (*Wallet, error) {
 		switch data := opt.(type) {
 		case func(rpc *ethrpc.EthRPC):
 			clientOptions = append(clientOptions, data)
+			log.Debug("Added RPC client option function")
 		case *ethrpc.EthRPC:
 			client = data
+			log.Debug("Using provided RPC client")
 		case string:
 			version = data
+			log.Debug("Using provided network version", "version", version)
 		case *big.Int:
 			chainID = data
+			log.Debug("Using provided chain ID", "chainID", chainID.String())
 		case *Wallet:
 			chainID = data.ChainID
 			client = data.Client
+			log.Debug("Copying configuration from existing wallet", "chainID", chainID.String())
 		}
 	}
 	signer, err := NewSigner(prvHex)
 	if err != nil {
+		log.Error("Failed to create signer for wallet", "error", err)
 		return nil, err
 	}
 
 	if client == nil {
+		log.Debug("Creating new RPC client", "rpc", rpc)
 		client = ethrpc.New(rpc, clientOptions...)
 	}
 
 	if version == "" {
+		log.Debug("Fetching network version from RPC")
 		version, err = client.NetVersion()
 		if err != nil {
+			log.Error("Failed to get network version", "error", err)
 			return nil, err
 		}
+		log.Debug("Network version retrieved", "version", version)
 	}
 	if chainID == nil {
+		log.Debug("Parsing chain ID from version", "version", version)
 		var ok bool
 		chainID, ok = new(big.Int).SetString(version, 10)
 		if !ok {
+			log.Error("Invalid chain ID format", "version", version)
 			return nil, fmt.Errorf("wrong chainID: %s", version)
 		}
+		log.Debug("Chain ID parsed successfully", "chainID", chainID.String())
 	}
+
+	log.Debug("Wallet created successfully",
+		"address", signer.Address.Hex(),
+		"chainID", chainID.String(),
+		"rpc", rpc)
 
 	return &Wallet{
 		Address: signer.Address,
@@ -177,17 +198,27 @@ func NewWallet(prvHex, rpc string, options ...any) (*Wallet, error) {
 }
 
 func NewWalletFromPath(prvPath, rpc string) (*Wallet, error) {
+	log.Debug("Creating wallet from private key file", "path", prvPath, "rpc", rpc)
 	b, err := os.ReadFile(prvPath)
 	if err != nil {
+		log.Error("Failed to read private key file for wallet", "path", prvPath, "error", err)
 		return nil, err
 	}
 
+	log.Debug("Private key file read successfully for wallet creation", "path", prvPath)
 	return NewWallet(strings.TrimSpace(string(b)), rpc)
 }
 
 func (w *Wallet) SendTx(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (txHash string, err error) {
+	log.Debug("Sending dynamic fee transaction",
+		"from", w.Address.Hex(),
+		"to", to.Hex(),
+		"amount", amount.String(),
+		"dataLength", len(data))
+
 	opts, err = w.InitTxOpts(to, amount, data, opts)
 	if err != nil {
+		log.Error("Failed to initialize transaction options", "error", err)
 		return
 	}
 
@@ -200,20 +231,36 @@ func (w *Wallet) SendTx(to common.Address, amount *big.Int, data []byte, opts *T
 		*opts.GasLimit, opts.GasTipCap, opts.GasFeeCap,
 		data, w.ChainID)
 	if err != nil {
+		log.Error("Failed to sign transaction", "error", err)
 		return
 	}
 
 	raw, err := tx.MarshalBinary()
 	if err != nil {
+		log.Error("Failed to marshal transaction", "error", err)
 		return
 	}
 
-	return w.Client.EthSendRawTransaction(hexutil.Encode(raw))
+	txHash, err = w.Client.EthSendRawTransaction(hexutil.Encode(raw))
+	if err != nil {
+		log.Error("Failed to send raw transaction", "error", err)
+		return
+	}
+
+	log.Debug("Dynamic fee transaction sent successfully", "txHash", txHash)
+	return txHash, nil
 }
 
 func (w *Wallet) SendLegacyTx(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (txHash string, err error) {
+	log.Debug("Sending legacy transaction",
+		"from", w.Address.Hex(),
+		"to", to.Hex(),
+		"amount", amount.String(),
+		"dataLength", len(data))
+
 	opts, err = w.InitTxOpts(to, amount, data, opts)
 	if err != nil {
+		log.Error("Failed to initialize legacy transaction options", "error", err)
 		return
 	}
 
@@ -225,15 +272,24 @@ func (w *Wallet) SendLegacyTx(to common.Address, amount *big.Int, data []byte, o
 		*opts.GasLimit, opts.GasPrice,
 		data, w.ChainID)
 	if err != nil {
+		log.Error("Failed to sign legacy transaction", "error", err)
 		return
 	}
 
 	raw, err := tx.MarshalBinary()
 	if err != nil {
+		log.Error("Failed to marshal legacy transaction", "error", err)
 		return
 	}
 
-	return w.Client.EthSendRawTransaction(hexutil.Encode(raw))
+	txHash, err = w.Client.EthSendRawTransaction(hexutil.Encode(raw))
+	if err != nil {
+		log.Error("Failed to send raw legacy transaction", "error", err)
+		return
+	}
+
+	log.Debug("Legacy transaction sent successfully", "txHash", txHash)
+	return txHash, nil
 }
 
 func (w *Wallet) InitTxOpts(to common.Address, amount *big.Int, data []byte, opts *TxOpts) (*TxOpts, error) {
