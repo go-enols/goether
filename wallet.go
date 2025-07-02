@@ -145,10 +145,12 @@ func NewWallet(prvHex, rpc string, options ...any) (*Wallet, error) {
 			log.Debug("Using provided network version", "version", version)
 		case *big.Int:
 			chainID = data
+			version = data.String()
 			log.Debug("Using provided chain ID", "chainID", chainID.String())
 		case *Wallet:
 			chainID = data.ChainID
 			client = data.Client
+			version = data.ChainID.String()
 			log.Debug("Copying configuration from existing wallet", "chainID", chainID.String())
 		}
 	}
