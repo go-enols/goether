@@ -24,6 +24,10 @@ type Signer struct {
 
 func NewSigner(prvHex string) (*Signer, error) {
 	log.Debug("Creating new signer from private key")
+	// 去除可能存在的 0x 前缀
+	if strings.HasPrefix(prvHex, "0x") || strings.HasPrefix(prvHex, "0X") {
+		prvHex = prvHex[2:]
+	}
 	k, err := crypto.HexToECDSA(prvHex)
 	if err != nil {
 		log.Error("Failed to parse private key", "error", err)
